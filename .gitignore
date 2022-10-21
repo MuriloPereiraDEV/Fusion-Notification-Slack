@@ -1,0 +1,4 @@
+csvFuncionarios/
+*.env
+login.py
+padraoEmails.py
