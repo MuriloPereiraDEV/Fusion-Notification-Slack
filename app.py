@@ -22,48 +22,49 @@ import time
 
 def start():
 
-    #   ESTABELECE A CONEXAO COM O EMAIL NO-REPLI@SOFTEX.BR
+    #ESTABLISH THE CONNECTION WITH THE EMAIL THAT MAKES AUTOMATIC TRIGGERS
     meu_email = MailBox('imap.gmail.com').login(cripto(usuario), cripto(senha), "[Gmail]/E-mails enviados")
 
-    #   PEGA DATA ATUAL
+    #GET CURRENT DATE
     dataAux = datetime.now().date()
 
     dataAuxFormatada = ("SENTON " + dataAux.strftime("%d-%b-%Y"))
-    #print(dataAuxFormatada)
-    #   VAI PROCURAR EMAILS QUE FORAM ENVIADOS A TODOS OS FUNCIONARIOS DA SOFTEX
+    
+    #YOU WILL LOOK FOR EMAILS THAT HAVE BEEN SENT TO ALL COMPANY EMPLOYEES
     for nick in dados:
         
         for msg in meu_email.fetch(AND(to=dados[nick], date=dataAux, seen=True)):
-            #    ACESSA O DOCUMENTO E PEGA O TOKEN NECESSARIO PARA CONEXÃO COM SLACK
+            #ACCESS THE DOCUMENT AND GET THE NECESSARY TOKEN FOR CONNECTION WITH SLACK
             env_path = Path('.') / '.env'
             load_dotenv(dotenv_path=env_path)
             client = slack.WebClient(token=os.environ['SLACK_TOKEN'])
 
-            #    PEGA HTML DO EMAIL PARA SER TRATADO
+            #GET HTML FROM THE EMAIL TO BE PROCESSED
             soup = BeautifulSoup(msg.html, 'html5lib')
 
-            #    ANALISA PADRAO DE EMAIL PARA DISTINGUIR TIPO DE TRATAMENTO
+            #ANALYZES EMAIL PATTERN TO DISTINGUISH TYPE OF TREATMENT
             if padraoEmails.devolutivaSolicitaçãoPagamento in msg.subject:
-                #    PEGA A INFORMAÇÃO DE UMA SEÇÃO ESPECIFICA DO CODIGO HTML
+                #GETS INFORMATION FROM A SPECIFIC SECTION OF THE HTML CODE
                 mailTxtHtml = soup.find('p', attrs={'id': 'ext-gen1368'})
                 mailTxtFinal = mailTxtHtml.text + "\nComprovante enviado ao seu e-mail."
                 if dados[nick] == "murilo.pereira@softex.br":
                     client.chat_postMessage(channel="@murilo.pereira", text=mailTxtFinal)
             elif (padraoEmails.neomindFusionTarefaAvisoPagamento in msg.subject)|(padraoEmails.neomindFusionTarefaAtrasadaPagamento in msg.subject) | (padraoEmails.tarefaRealocada in msg.subject) | (padraoEmails.novaTarefaDisponívelExecução in msg.subject) | (padraoEmails.tarefaPendente in msg.subject) | (padraoEmails.tarefaAtrasada in msg.subject) | (padraoEmails.tarefaAviso in msg.subject):
-                #    PEGA A INFORMAÇÃO DE UMA SEÇÃO ESPECIFICA DO CODIGO HTML
+                #GETS INFORMATION FROM A SPECIFIC SECTION OF THE HTML CODE
                 mailTxtHtml = soup.find('p', attrs={'class': 'mail_txt'})
                 mailTxtFinal = mailTxtHtml.text
                 if dados[nick] == "murilo.pereira@softex.br":
                     client.chat_postMessage(channel="@murilo.pereira", text=mailTxtFinal)
                 #client.chat_postMessage(channel="@"+str(nick), text=mailTxtFinal)
 
-    #   COLOCA A FLAG DE "UNSEEN" EM TODOS OS EMAILS LIDOS PARA AUXILIAR A LEITURA DOS PROXIMOS
+    #PUT THE "UNSEEN" FLAG IN ALL EMAILS READ TO HELP READ THE NEXT
     with meu_email as meu:
         meu.flag(meu.uids(dataAuxFormatada), MailMessageFlags.SEEN, False)
     print("terminou")
 
 schedule.every(5).minutes.do(start)
 
+#ANALYSIS IF IT HAS PENDING ACTIVITIES AND PERFORMS THEM
 while 1:
     schedule.run_pending()
     time.sleep(1)
